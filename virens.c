@@ -5,6 +5,9 @@
 #include <unistd.h>
 #include <termios.h>
 
+/*** defines ***/
+#define CTRL_KEY(k) ((k) & 0x1f)
+
 struct termios orig_termios;
 
 void die(const char *s) {
@@ -38,22 +41,48 @@ void enable_raw(void)
     die("tcsetattr");
 }
 
+void refreshScreen()
+{
+  write(STDOUT_FILENO, "\x1b[2J", 4);
+  write(STDOUT_FILENO, "\x1b[H", 3);
+}
+
+char editorReadKey()
+{
+  int nread;
+  char character;
+
+  while ((nread = read(STDIN_FILENO, &character, 1)) != 1)
+  {
+     if (read(STDIN_FILENO, &character, 1) == -1 && errno != EAGAIN)
+     {
+       die("read");
+     }
+
+     return character;
+  }
+}
+
+void processKeyPress()
+{
+  char character = editorReadKey();
+
+  if (character == CTRL_KEY('q'))
+  {
+    write(STDOUT_FILENO, "\x1b[2J", 4);
+    write(STDOUT_FILENO, "\x1b[H", 3);
+
+    exit(0);
+  }
+}
+
 int main(int argc, char const *argv[])
 {
   enable_raw();
 
   while (1) {
-    char character = '\0';
-
-  if (read(STDIN_FILENO, &character, 1) == -1 && errno != EAGAIN)
-      die("read");
-
-    if (iscntrl(character))
-      printf("%d\r\n", character);
-    else
-      printf("%d ('%c')\r\n", character, character);
-
-    if (character == 'q') break;
+    refreshScreen();
+    processKeyPress();
   }
 
   return 0;
